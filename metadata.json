@@ -1,0 +1,6 @@
+{
+  "name": "Celebrity Profiles & Directory",
+  "description": "Comprehensive celebrity profile system featuring biography, family details, filmography, awards, titles, social posts, and booking/collaboration inquiry system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
