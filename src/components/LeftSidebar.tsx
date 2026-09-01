@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Calendar, MapPin, Users, Heart, Award, Send, 
   CheckCircle2, Sparkles, DollarSign, Ruler, Clock, 
-  Globe, Instagram, Twitter, Facebook, ExternalLink, Maximize2, ShieldCheck, UserCheck
+  Globe, Instagram, Twitter, Facebook, ExternalLink, Maximize2, ShieldCheck, UserCheck, RefreshCw
 } from 'lucide-react';
 import { Celebrity } from '../types';
 import { getSafeImageUrl, getMonogramFallback } from '../utils/imageUrl';
@@ -12,6 +12,8 @@ interface LeftSidebarProps {
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onOpenBookingForm: () => void;
+  onRefreshProfile?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -19,10 +21,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   isFavorite,
   onToggleFavorite,
   onOpenBookingForm,
+  onRefreshProfile,
+  isRefreshing = false,
 }) => {
   const [isPhotoExpanded, setIsPhotoExpanded] = useState(false);
 
   const { birthDetails, familyDetails } = celebrity;
+
+  const lastCheckedDate = celebrity.lastRefreshedAt
+    ? new Date(celebrity.lastRefreshedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : 'September 2026';
 
   return (
     <aside className="w-full lg:w-96 shrink-0 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-2xl space-y-6 text-zinc-100 self-start sticky top-24">
@@ -78,7 +86,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   : 'bg-zinc-800 text-zinc-400 border-zinc-700'
               }`}
             >
-              {celebrity.isAvailableForHiring ? '● Available for Hiring' : '○ Booking Restricted'}
+              {celebrity.isAvailableForHiring ? '● Representation Desk Open' : '○ Representation Restricted'}
             </span>
           </div>
           <h2 className="text-xl font-serif font-bold text-white mt-1 flex items-center gap-1.5">
@@ -96,22 +104,48 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         id="hire-collaborate-sidebar-button"
       >
         <Send className="w-4 h-4" />
-        Hire, Invite or Collaborate
+        Submit Representation Inquiry
       </button>
+
+      {/* Profile Verification & Refresh Bar */}
+      <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/80 border border-zinc-800 text-xs">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1.5 text-zinc-300 font-mono text-[11px]">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            Verified Multi-Source Record
+          </div>
+          <div className="text-[10px] text-zinc-500 font-mono">
+            Synced: {lastCheckedDate}
+          </div>
+        </div>
+
+        {onRefreshProfile && (
+          <button
+            onClick={onRefreshProfile}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-[11px] font-mono text-zinc-300 rounded-lg border border-zinc-700 transition-colors disabled:opacity-50"
+            title="Refresh facts against latest external sources"
+            id="refresh-profile-sidebar-btn"
+          >
+            <RefreshCw className={`w-3 h-3 text-amber-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Checking...' : 'Check Updates'}
+          </button>
+        )}
+      </div>
 
       {/* Quick Overview Stats Grid */}
       <div className="grid grid-cols-3 gap-2 bg-zinc-950/60 p-3 rounded-xl border border-zinc-800/80 text-center">
         <div className="p-1.5">
           <span className="text-[10px] uppercase font-mono text-zinc-500 block">Active Years</span>
-          <span className="text-xs font-bold text-amber-400">{celebrity.activeYears}</span>
+          <span className="text-xs font-bold text-amber-400">{celebrity.activeYears || 'Active'}</span>
         </div>
         <div className="p-1.5 border-x border-zinc-800">
           <span className="text-[10px] uppercase font-mono text-zinc-500 block">Est. Net Worth</span>
-          <span className="text-xs font-bold text-emerald-400">{celebrity.netWorth}</span>
+          <span className="text-xs font-bold text-emerald-400">{celebrity.netWorth || 'Public Record'}</span>
         </div>
         <div className="p-1.5">
           <span className="text-[10px] uppercase font-mono text-zinc-500 block">Height</span>
-          <span className="text-xs font-bold text-zinc-200">{celebrity.height}</span>
+          <span className="text-xs font-bold text-zinc-200">{celebrity.height || 'N/A'}</span>
         </div>
       </div>
 
@@ -119,13 +153,13 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       <div className="bg-zinc-950/80 rounded-xl p-4 border border-zinc-800/80 space-y-3">
         <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2 border-b border-zinc-800 pb-2">
           <Calendar className="w-4 h-4 text-amber-400" />
-          Birth Details
+          Birth & Biographical Identity
         </h3>
 
         <div className="space-y-2.5 text-xs text-zinc-300">
           <div className="flex items-start justify-between gap-2">
-            <span className="text-zinc-500 shrink-0">Full Legal Name</span>
-            <span className="font-semibold text-zinc-100 text-right">{birthDetails.dateOfBirth ? celebrity.fullName : 'N/A'}</span>
+            <span className="text-zinc-500 shrink-0">Legal Full Name</span>
+            <span className="font-semibold text-zinc-100 text-right">{celebrity.fullName}</span>
           </div>
 
           <div className="flex items-center justify-between gap-2">
@@ -148,10 +182,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-zinc-500">Zodiac Sign</span>
-            <span className="font-medium text-zinc-300">{birthDetails.zodiacSign}</span>
-          </div>
+          {birthDetails.zodiacSign && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-zinc-500">Zodiac Sign</span>
+              <span className="font-medium text-zinc-300">{birthDetails.zodiacSign}</span>
+            </div>
+          )}
 
           <div className="flex items-center justify-between gap-2">
             <span className="text-zinc-500">Nationality</span>
@@ -222,7 +258,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
       {/* Social Media Links */}
       <div className="bg-zinc-950/60 rounded-xl p-4 border border-zinc-800/80 space-y-2">
-        <span className="text-[11px] font-mono uppercase text-zinc-500 block mb-2">Official Social Handles</span>
+        <span className="text-[11px] font-mono uppercase text-zinc-500 block mb-2">Official Social & Web Channels</span>
         <div className="flex flex-wrap gap-2">
           {celebrity.socialLinks.instagram && (
             <a

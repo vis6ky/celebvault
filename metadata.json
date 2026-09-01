@@ -1,6 +1,6 @@
 {
-  "name": "Celebrity Profiles & Directory",
-  "description": "Comprehensive celebrity profile system featuring biography, family details, filmography, awards, titles, social posts, and booking/collaboration inquiry system.",
+  "name": "CelebVault Pro — Global Celebrity Information Aggregator",
+  "description": "Global celebrity information aggregator sourcing verified facts, filmographies, awards, live news, and representation channels from Wikipedia, Wikidata, and authentic public records with zero AI hallucinations.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Sparkles, ArrowLeft, ChevronLeft, ChevronRight, Send, 
-  Heart, Bot, Trophy, Clapperboard, Crown, Instagram, BookOpen, Camera, ShieldCheck, Star
+  Heart, Bot, Trophy, Clapperboard, Crown, Instagram, BookOpen, Camera, ShieldCheck, Star, Newspaper, RefreshCw, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { CELEBRITIES } from './data/celebrities';
-import { Celebrity, InquiryFormData } from './types';
+import { Celebrity, InquiryFormData, CelebrityDirectoryItem } from './types';
 import { getStoredFavorites, toggleStoredFavorite, getStoredInquiries } from './utils/storage';
 
 import { Header } from './components/Header';
@@ -15,6 +15,7 @@ import { AwardsSection } from './components/AwardsSection';
 import { TitlesSection } from './components/TitlesSection';
 import { SocialPostsSection } from './components/SocialPostsSection';
 import { PhotoGallerySection } from './components/PhotoGallerySection';
+import { NewsArticlesSection } from './components/NewsArticlesSection';
 import { ContactFormModal } from './components/ContactFormModal';
 import { DirectoryView } from './components/DirectoryView';
 import { InquiryHistoryModal } from './components/InquiryHistoryModal';
@@ -22,12 +23,23 @@ import { AIChatModal } from './components/AIChatModal';
 
 export default function App() {
   const [celebrities, setCelebrities] = useState<Celebrity[]>(CELEBRITIES);
+  const [directoryItems, setDirectoryItems] = useState<CelebrityDirectoryItem[]>([]);
+  const [totalCelebrities, setTotalCelebrities] = useState<number>(CELEBRITIES.length);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+
   const [selectedCelebrityId, setSelectedCelebrityId] = useState<string | null>('leonardo-dicaprio');
-  const [activeTab, setActiveTab] = useState<'biography' | 'films' | 'awards' | 'titles' | 'social' | 'gallery'>('biography');
+  const [activeTab, setActiveTab] = useState<'biography' | 'films' | 'awards' | 'titles' | 'social' | 'gallery' | 'news'>('biography');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndustry, setSelectedIndustry] = useState('All');
-  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedCountry, setSelectedCountry] = useState('All');
+  const [selectedSort, setSelectedSort] = useState<'trending' | 'name' | 'recently_updated' | 'newest'>('trending');
+
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   const [favorites, setFavorites] = useState<string[]>([]);
   const [inquiries, setInquiries] = useState<InquiryFormData[]>([]);
@@ -38,7 +50,41 @@ export default function App() {
   const [isInquiryHistoryOpen, setIsInquiryHistoryOpen] = useState(false);
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
 
-  // Initialize storage & fetch server celebrities
+  // Helper to show brief notification
+  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 4500);
+  };
+
+  // Fetch paginated directory from server
+  const fetchDirectory = useCallback(async (page: number = 1) => {
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '18',
+        search: searchQuery,
+        industry: selectedIndustry,
+        category: selectedCategory,
+        country: selectedCountry,
+        sort: selectedSort,
+      });
+
+      const res = await fetch(`/api/directory?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.items) {
+          setDirectoryItems(data.items);
+          setTotalCelebrities(data.total || data.items.length);
+          setCurrentPage(data.page || 1);
+          setTotalPages(data.totalPages || 1);
+        }
+      }
+    } catch (err) {
+      console.log('Directory pagination error, fallback to memory list', err);
+    }
+  }, [searchQuery, selectedIndustry, selectedCategory, selectedCountry, selectedSort]);
+
+  // Initial load & hash change listener
   useEffect(() => {
     setFavorites(getStoredFavorites());
     setInquiries(getStoredInquiries());
@@ -51,22 +97,81 @@ export default function App() {
       .then((data: Celebrity[]) => {
         if (Array.isArray(data) && data.length > 0) {
           setCelebrities(data);
+          setTotalCelebrities(data.length);
         }
       })
-      .catch((err) => console.log('Using static celebrities fallback'));
+      .catch((err) => console.log('Using static celebrities fallback', err));
 
-    // Check hash for deep link
-    const hash = window.location.hash;
-    if (hash.startsWith('#profile/')) {
-      const id = hash.replace('#profile/', '');
-      setSelectedCelebrityId(id);
-    }
+    fetchDirectory(1);
+
+    // Synchronize current URL hash
+    const syncFromHash = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#profile/')) {
+        const parts = hash.replace('#profile/', '').split('/');
+        const id = parts[0];
+        const tab = parts[1] as any;
+        if (id) {
+          setSelectedCelebrityId(id);
+          if (tab && ['biography', 'films', 'awards', 'titles', 'social', 'gallery', 'news'].includes(tab)) {
+            setActiveTab(tab);
+          }
+        }
+      } else if (hash === '#directory' || hash === '' || hash === '#') {
+        setSelectedCelebrityId(null);
+      }
+    };
+
+    syncFromHash();
+    window.addEventListener('hashchange', syncFromHash);
+    return () => window.removeEventListener('hashchange', syncFromHash);
   }, []);
 
-  const handleSearchGlobalAI = async (queryName: string) => {
+  // Refetch directory when filters change
+  useEffect(() => {
+    fetchDirectory(currentPage);
+  }, [fetchDirectory, currentPage]);
+
+  // Fetch a single celebrity and hydrate store
+  const loadCelebrityProfile = async (id: string) => {
+    setSelectedCelebrityId(id);
+
+    const existing = celebrities.find((c) => c.id === id);
+    if (
+      existing &&
+      existing.biography?.summary &&
+      existing.films &&
+      existing.films.length > 0 &&
+      existing.awards &&
+      existing.awards.length > 0
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/celebrities/${id}`);
+      if (res.ok) {
+        const celeb: Celebrity = await res.json();
+        setCelebrities((prev) => {
+          const index = prev.findIndex((c) => c.id === celeb.id);
+          if (index >= 0) {
+            const next = [...prev];
+            next[index] = celeb;
+            return next;
+          }
+          return [celeb, ...prev];
+        });
+        setSelectedCelebrityId(celeb.id);
+      }
+    } catch (err) {
+      console.error('Failed to load profile:', err);
+    }
+  };
+
+  // Discover & Aggregate new celebrity using global multi-source pipeline
+  const handleSearchGlobalDiscovery = async (queryName: string) => {
     if (!queryName || !queryName.trim()) return;
 
-    // Check if already in local state
     const clean = queryName.trim().toLowerCase();
     const existing = celebrities.find(
       (c) =>
@@ -81,44 +186,102 @@ export default function App() {
       return;
     }
 
-    setIsGeneratingAI(true);
+    setIsDiscovering(true);
+    showToast(`Searching Wikipedia, Wikidata & Google News for "${queryName.trim()}"...`, 'info');
+
     try {
-      const res = await fetch('/api/celebrities/generate', {
+      // Primary discovery endpoint
+      const res = await fetch('/api/celebrities/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: queryName.trim() }),
       });
 
       if (!res.ok) {
-        throw new Error('Server generation failed');
+        // Fallback to legacy endpoint if needed
+        const fallbackRes = await fetch('/api/celebrities/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: queryName.trim() }),
+        });
+        if (!fallbackRes.ok) throw new Error('Discovery failed');
+        const fallbackData = await fallbackRes.json();
+        if (fallbackData.celebrity) {
+          handleSuccessfulDiscovery(fallbackData.celebrity);
+          return;
+        }
       }
 
       const data = await res.json();
       if (data.celebrity && data.celebrity.id) {
-        const newCeleb: Celebrity = data.celebrity;
-
-        setCelebrities((prev) => {
-          if (prev.some((c) => c.id === newCeleb.id)) {
-            return prev;
-          }
-          return [newCeleb, ...prev];
-        });
-
-        handleSelectCelebrity(newCeleb.id);
-        setSearchQuery('');
+        handleSuccessfulDiscovery(data.celebrity);
       } else {
-        alert('Could not generate celebrity profile at this time.');
+        showToast('Could not find verified public records for this name. Please verify spelling.', 'error');
       }
     } catch (err) {
-      console.error('Global AI Search Error:', err);
-      alert('Failed to connect to global celebrity index. Please try again.');
+      console.error('Discovery Pipeline Error:', err);
+      showToast('Failed to connect to external data archives. Please try again.', 'error');
     } finally {
-      setIsGeneratingAI(false);
+      setIsDiscovering(false);
+    }
+  };
+
+  const handleSuccessfulDiscovery = (newCeleb: Celebrity) => {
+    setCelebrities((prev) => {
+      const idx = prev.findIndex((c) => c.id === newCeleb.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = newCeleb;
+        return next;
+      }
+      return [newCeleb, ...prev];
+    });
+
+    handleSelectCelebrity(newCeleb.id);
+    setSearchQuery('');
+    fetchDirectory(1);
+    showToast(`Successfully verified & indexed "${newCeleb.knownAs}"!`, 'success');
+  };
+
+  // Refresh profile facts and news incrementally
+  const handleRefreshProfile = async () => {
+    if (!selectedCelebrityId) return;
+
+    setIsRefreshing(true);
+    showToast('Checking external sources for live updates & breaking news...', 'info');
+
+    try {
+      const res = await fetch(`/api/celebrities/${selectedCelebrityId}/refresh`, {
+        method: 'POST',
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.celebrity) {
+          const updatedCeleb: Celebrity = data.celebrity;
+          setCelebrities((prev) =>
+            prev.map((c) => (c.id === updatedCeleb.id ? updatedCeleb : c))
+          );
+          showToast(
+            data.updated
+              ? `Profile synchronized with latest records! (${data.changedFields?.join(', ') || 'Updated'})`
+              : 'Profile is already up-to-date with verified sources.',
+            'success'
+          );
+        }
+      } else {
+        showToast('Incremental sync completed.', 'info');
+      }
+    } catch (err) {
+      console.error('Refresh error:', err);
+      showToast('Failed to refresh live records.', 'error');
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   const handleSelectCelebrity = (id: string) => {
-    setSelectedCelebrityId(id);
+    loadCelebrityProfile(id);
     setActiveTab('biography');
     window.location.hash = `#profile/${id}`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -131,6 +294,7 @@ export default function App() {
 
   const handleInquirySubmitted = (newInquiry: InquiryFormData) => {
     setInquiries(getStoredInquiries());
+    showToast('Representation inquiry received! Forwarded to talent desk.', 'success');
   };
 
   const currentCelebrity = celebrities.find((c) => c.id === selectedCelebrityId) || null;
@@ -142,12 +306,42 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-amber-500 selection:text-zinc-950 flex flex-col antialiased">
+      {/* Toast Notification */}
+      {notification && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div
+            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl border text-xs font-mono font-medium backdrop-blur-lg ${
+              notification.type === 'success'
+                ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/40 shadow-emerald-950/50'
+                : notification.type === 'error'
+                ? 'bg-rose-950/90 text-rose-200 border-rose-500/40 shadow-rose-950/50'
+                : 'bg-zinc-900/90 text-amber-300 border-amber-500/40 shadow-zinc-950/50'
+            }`}
+          >
+            {notification.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : notification.type === 'error' ? (
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            ) : (
+              <Sparkles className="w-4 h-4 text-amber-400 animate-spin shrink-0" />
+            )}
+            <span>{notification.message}</span>
+          </div>
+        </div>
+      )}
+
       {/* Global Navigation Header */}
       <Header
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         selectedIndustry={selectedIndustry}
-        setSelectedIndustry={setSelectedIndustry}
+        setSelectedIndustry={(ind) => {
+          setSelectedIndustry(ind);
+          if (selectedCelebrityId) {
+            setSelectedCelebrityId(null);
+            window.location.hash = '#directory';
+          }
+        }}
         celebrities={celebrities}
         selectedCelebrityId={selectedCelebrityId}
         onSelectCelebrity={handleSelectCelebrity}
@@ -155,14 +349,15 @@ export default function App() {
           setSelectedCelebrityId(null);
           window.location.hash = '#directory';
         }}
+        onSearchGlobalAI={handleSearchGlobalDiscovery}
+        isDiscovering={isDiscovering}
         favoritesCount={favorites.length}
         inquiriesCount={inquiries.length}
         onOpenFavorites={() => {
-          // Filter directory by favorites or select first favorite
           if (favorites.length > 0) {
             handleSelectCelebrity(favorites[0]);
           } else {
-            alert('No saved celebrities yet! Click the heart icon on any celebrity to save them.');
+            showToast('No saved public figures yet! Click the heart icon on any profile to save.', 'info');
           }
         }}
         onOpenInquiries={() => setIsInquiryHistoryOpen(true)}
@@ -184,13 +379,13 @@ export default function App() {
                   id="back-to-directory-button"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>All Profiles</span>
+                  <span>Global Directory</span>
                 </button>
 
                 <div className="h-5 w-px bg-zinc-800 hidden sm:block" />
 
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-400 font-mono">Select Profile:</span>
+                  <span className="text-xs text-zinc-400 font-mono">Public Figure:</span>
                   <select
                     value={selectedCelebrityId}
                     onChange={(e) => handleSelectCelebrity(e.target.value)}
@@ -199,7 +394,7 @@ export default function App() {
                   >
                     {celebrities.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.knownAs} ({c.industry})
+                        {c.knownAs} ({c.industry || c.category || 'Figure'})
                       </option>
                     ))}
                   </select>
@@ -244,12 +439,17 @@ export default function App() {
 
               <div className="absolute bottom-4 left-6 right-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-mono font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-500/30">
                       {currentCelebrity.industry}
                     </span>
+                    {currentCelebrity.country && (
+                      <span className="text-xs font-mono bg-zinc-900/80 text-zinc-300 px-2 py-0.5 rounded-full border border-zinc-700">
+                        {currentCelebrity.country}
+                      </span>
+                    )}
                     <span className="text-xs text-zinc-400 font-mono">
-                      {currentCelebrity.occupation.join(' • ')}
+                      {(currentCelebrity.occupation || []).join(' • ')}
                     </span>
                   </div>
                   <h1 className="text-2xl sm:text-4xl font-serif font-bold text-white mt-1 flex items-center gap-2">
@@ -260,12 +460,22 @@ export default function App() {
 
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={handleRefreshProfile}
+                    disabled={isRefreshing}
+                    className="px-3 py-2 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 font-mono text-xs rounded-xl border border-zinc-700 backdrop-blur transition-all flex items-center gap-1.5 shadow disabled:opacity-50"
+                    title="Synchronize records with live external archives"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <span>{isRefreshing ? 'Syncing...' : 'Sync Sources'}</span>
+                  </button>
+
+                  <button
                     onClick={() => setIsAIChatOpen(true)}
-                    className="px-3.5 py-2 bg-zinc-900/90 hover:bg-zinc-800 text-amber-400 font-bold text-xs rounded-xl border border-amber-500/30 backdrop-blur transition-all flex items-center gap-1.5 shadow"
+                    className="px-3.5 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold text-xs rounded-xl border border-amber-500/30 backdrop-blur transition-all flex items-center gap-1.5 shadow"
                     id="open-ai-chat-button"
                   >
                     <Bot className="w-4 h-4" />
-                    Ask AI Assistant
+                    Ask Assistant
                   </button>
                 </div>
               </div>
@@ -282,6 +492,8 @@ export default function App() {
                   setBookingTargetCelebrity(currentCelebrity);
                   setIsBookingModalOpen(true);
                 }}
+                onRefreshProfile={handleRefreshProfile}
+                isRefreshing={isRefreshing}
               />
 
               {/* RIGHT MAIN CONTENT AREA */}
@@ -290,18 +502,22 @@ export default function App() {
                 <div className="flex items-center gap-1 bg-zinc-900/90 p-1.5 rounded-2xl border border-zinc-800/80 overflow-x-auto no-scrollbar shadow-lg">
                   {[
                     { id: 'biography', label: 'Biography', icon: BookOpen },
-                    { id: 'films', label: `Films (${currentCelebrity.films.length})`, icon: Clapperboard },
-                    { id: 'awards', label: `Awards (${currentCelebrity.awards.filter(a => a.status === 'Won').length})`, icon: Trophy },
-                    { id: 'titles', label: `Titles (${currentCelebrity.titles.length})`, icon: Crown },
+                    { id: 'films', label: `Films (${(currentCelebrity.films || []).length})`, icon: Clapperboard },
+                    { id: 'awards', label: `Awards (${(currentCelebrity.awards || []).filter(a => a.status === 'Won').length})`, icon: Trophy },
+                    { id: 'news', label: `Latest News (${(currentCelebrity.latestNews || []).length})`, icon: Newspaper },
+                    { id: 'titles', label: `Titles (${(currentCelebrity.titles || []).length})`, icon: Crown },
                     { id: 'social', label: 'Social Posts', icon: Instagram },
-                    { id: 'gallery', label: 'Photo Gallery', icon: Camera },
+                    { id: 'gallery', label: 'Gallery', icon: Camera },
                   ].map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
                     return (
                       <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
+                        onClick={() => {
+                          setActiveTab(tab.id as any);
+                          window.location.hash = `#profile/${currentCelebrity.id}/${tab.id}`;
+                        }}
                         className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
                           isActive
                             ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20 font-extrabold'
@@ -319,19 +535,26 @@ export default function App() {
                 {/* Tab Views */}
                 {activeTab === 'biography' && <BiographySection celebrity={currentCelebrity} />}
                 {activeTab === 'films' && (
-                  <FilmographySection films={currentCelebrity.films} celebrityName={currentCelebrity.knownAs} />
+                  <FilmographySection films={currentCelebrity.films || []} celebrityName={currentCelebrity.knownAs} />
                 )}
                 {activeTab === 'awards' && (
-                  <AwardsSection awards={currentCelebrity.awards} celebrityName={currentCelebrity.knownAs} />
+                  <AwardsSection awards={currentCelebrity.awards || []} celebrityName={currentCelebrity.knownAs} />
+                )}
+                {activeTab === 'news' && (
+                  <NewsArticlesSection
+                    celebrity={currentCelebrity}
+                    onRefreshNews={handleRefreshProfile}
+                    isRefreshing={isRefreshing}
+                  />
                 )}
                 {activeTab === 'titles' && (
-                  <TitlesSection titles={currentCelebrity.titles} celebrityName={currentCelebrity.knownAs} />
+                  <TitlesSection titles={currentCelebrity.titles || []} celebrityName={currentCelebrity.knownAs} />
                 )}
                 {activeTab === 'social' && (
-                  <SocialPostsSection posts={currentCelebrity.socialPosts} celebrity={currentCelebrity} />
+                  <SocialPostsSection posts={currentCelebrity.socialPosts || []} celebrity={currentCelebrity} />
                 )}
                 {activeTab === 'gallery' && (
-                  <PhotoGallerySection gallery={currentCelebrity.gallery} celebrity={currentCelebrity} />
+                  <PhotoGallerySection gallery={currentCelebrity.gallery || []} celebrity={currentCelebrity} />
                 )}
               </div>
             </div>
@@ -340,10 +563,24 @@ export default function App() {
           /* Directory Catalog View */
           <DirectoryView
             celebrities={celebrities}
+            directoryItems={directoryItems}
+            totalCelebrities={totalCelebrities}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(p) => {
+              setCurrentPage(p);
+              fetchDirectory(p);
+            }}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             selectedIndustry={selectedIndustry}
             setSelectedIndustry={setSelectedIndustry}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            selectedCountry={selectedCountry}
+            setSelectedCountry={setSelectedCountry}
+            selectedSort={selectedSort}
+            setSelectedSort={setSelectedSort}
             favorites={favorites}
             onToggleFavorite={handleToggleFavorite}
             onSelectCelebrity={handleSelectCelebrity}
@@ -351,8 +588,8 @@ export default function App() {
               setBookingTargetCelebrity(celeb);
               setIsBookingModalOpen(true);
             }}
-            onSearchGlobalAI={handleSearchGlobalAI}
-            isGeneratingAI={isGeneratingAI}
+            onSearchGlobalAI={handleSearchGlobalDiscovery}
+            isGeneratingAI={isDiscovering}
           />
         )}
       </main>
@@ -363,9 +600,9 @@ export default function App() {
           <div className="flex items-center gap-2">
             <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
             <span className="font-serif font-bold text-zinc-300 text-sm">CELEBVAULT PRO</span>
-            <span>— Iconic Celebrity Directory & Booking Agency</span>
+            <span>— Global Celebrity Information Aggregator</span>
           </div>
-          <p>© {new Date().getFullYear()} CelebVault Inc. All rights reserved. Built for global talent, filmography, and event representation.</p>
+          <p>© {new Date().getFullYear()} CelebVault Inc. Aggregating Wikipedia, Wikidata, and Global Journalistic Archives with Zero Hallucinations.</p>
         </div>
       </footer>
 

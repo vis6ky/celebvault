@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Award as AwardIcon, Trophy, Star, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Award as AwardIcon, Trophy, Star, Sparkles, CheckCircle2, Search } from 'lucide-react';
 import { Award } from '../types';
 
 interface AwardsSectionProps {
@@ -7,16 +7,29 @@ interface AwardsSectionProps {
   celebrityName: string;
 }
 
-export const AwardsSection: React.FC<AwardsSectionProps> = ({ awards, celebrityName }) => {
+export const AwardsSection: React.FC<AwardsSectionProps> = ({ awards = [], celebrityName }) => {
   const [filterStatus, setFilterStatus] = useState<'All' | 'Won' | 'Nominated'>('Won');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredAwards = awards.filter((a) => {
+  const safeAwards = Array.isArray(awards) ? awards : [];
+
+  const filteredAwards = safeAwards.filter((a) => {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      !q ||
+      (a.awardName && a.awardName.toLowerCase().includes(q)) ||
+      (a.category && a.category.toLowerCase().includes(q)) ||
+      (a.project && a.project.toLowerCase().includes(q)) ||
+      (a.year && a.year.toString().includes(q));
+
+    if (!matchesSearch) return false;
     if (filterStatus === 'Won') return a.status === 'Won';
     if (filterStatus === 'Nominated') return a.status === 'Nominated';
     return true;
   });
 
-  const wonCount = awards.filter((a) => a.status === 'Won').length;
+  const wonCount = safeAwards.filter((a) => a.status === 'Won').length;
+  const nominatedCount = safeAwards.filter((a) => a.status === 'Nominated').length;
 
   return (
     <section className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-6 shadow-xl space-y-6">
@@ -29,26 +42,39 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ awards, celebrityN
           <div>
             <h2 className="text-xl font-serif font-bold text-white">Awards & Major Accolades</h2>
             <p className="text-xs text-zinc-400">
-              Honors received by {celebrityName} ({wonCount} Wins)
+              Honors received by {celebrityName} ({wonCount} Wins, {nominatedCount} Nominations)
             </p>
           </div>
         </div>
 
-        {/* Filter Pill */}
-        <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
-          {(['Won', 'All', 'Nominated'] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                filterStatus === status
-                  ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              {status}
-            </button>
-          ))}
+        {/* Filter Pill & Search */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Filter awards..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-zinc-950 text-xs text-zinc-200 placeholder-zinc-500 pl-8 pr-3 py-1.5 rounded-lg border border-zinc-800 focus:outline-none focus:border-amber-500/60 w-32 sm:w-40"
+            />
+          </div>
+
+          <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+            {(['Won', 'All', 'Nominated'] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                  filterStatus === status
+                    ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

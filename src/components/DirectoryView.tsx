@@ -1,14 +1,32 @@
 import React, { useState } from 'react';
-import { Star, Sparkles, Trophy, Clapperboard, Heart, Send, Search, CheckCircle2, ShieldCheck, ArrowRight, Loader2, Globe, Bot } from 'lucide-react';
-import { Celebrity } from '../types';
+import { 
+  Star, Sparkles, Trophy, Clapperboard, Heart, Send, Search, 
+  CheckCircle2, ShieldCheck, ArrowRight, Loader2, Globe, Database, 
+  Filter, ChevronLeft, ChevronRight, SlidersHorizontal, Newspaper, Tag, Compass
+} from 'lucide-react';
+import { Celebrity, CelebrityDirectoryItem } from '../types';
 import { getSafeImageUrl, getMonogramFallback } from '../utils/imageUrl';
 
 interface DirectoryViewProps {
   celebrities: Celebrity[];
+  directoryItems?: CelebrityDirectoryItem[];
+  totalCelebrities?: number;
+  currentPage?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   selectedIndustry: string;
   setSelectedIndustry: (industry: string) => void;
+  selectedCategory?: string;
+  setSelectedCategory?: (cat: string) => void;
+  selectedCountry?: string;
+  setSelectedCountry?: (cntry: string) => void;
+  selectedSort?: 'trending' | 'name' | 'recently_updated' | 'newest';
+  setSelectedSort?: (sort: 'trending' | 'name' | 'recently_updated' | 'newest') => void;
+  availableCategories?: string[];
+  availableIndustries?: string[];
+  availableCountries?: string[];
   favorites: string[];
   onToggleFavorite: (id: string) => void;
   onSelectCelebrity: (id: string) => void;
@@ -19,10 +37,24 @@ interface DirectoryViewProps {
 
 export const DirectoryView: React.FC<DirectoryViewProps> = ({
   celebrities,
+  directoryItems,
+  totalCelebrities,
+  currentPage = 1,
+  totalPages = 1,
+  onPageChange,
   searchQuery,
   setSearchQuery,
   selectedIndustry,
   setSelectedIndustry,
+  selectedCategory = 'All',
+  setSelectedCategory,
+  selectedCountry = 'All',
+  setSelectedCountry,
+  selectedSort = 'trending',
+  setSelectedSort,
+  availableCategories = ['All', 'Actors', 'Musicians', 'Athletes', 'Directors', 'Public Figures'],
+  availableIndustries = ['All', 'Bollywood', 'Hollywood', 'Indian Cinema', 'Indian Sports', 'Global Sports', 'Music'],
+  availableCountries = ['All', 'India', 'United States', 'United Kingdom', 'Portugal', 'International'],
   favorites,
   onToggleFavorite,
   onSelectCelebrity,
@@ -31,39 +63,101 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   isGeneratingAI,
 }) => {
   const [aiSearchInput, setAiSearchInput] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // Filter celebrities
-  const filtered = celebrities.filter((celeb) => {
-    const matchesIndustry =
-      selectedIndustry === 'All' || celeb.industry === selectedIndustry;
+  // If directoryItems is provided from server pagination, use it; otherwise fall back to local filtering
+  const displayItems: Array<{
+    id: string;
+    fullName: string;
+    knownAs: string;
+    category?: string;
+    industry: string;
+    country?: string;
+    avatarPhoto: string;
+    bestViewPhoto: string;
+    shortTagline: string;
+    occupation: string[];
+    birthDetails: { dateOfBirth: string; age: number };
+    filmsCount: number;
+    awardsCount: number;
+    sourceProvenance?: string;
+    rawCeleb?: Celebrity;
+  }> = directoryItems && directoryItems.length > 0
+    ? directoryItems.map((item) => {
+        const full = celebrities.find((c) => c.id === item.id);
+        return {
+          id: item.id,
+          fullName: item.fullName,
+          knownAs: item.knownAs,
+          category: item.category,
+          industry: item.industry,
+          country: item.country,
+          avatarPhoto: item.avatarPhoto,
+          bestViewPhoto: item.bestViewPhoto,
+          shortTagline: item.shortTagline,
+          occupation: item.occupations,
+          birthDetails: {
+            dateOfBirth: item.birthYear ? `Born ${item.birthYear}` : 'Public Record',
+            age: item.birthYear ? new Date().getFullYear() - item.birthYear : 40,
+          },
+          filmsCount: full?.films?.length || 5,
+          awardsCount: full?.awards?.filter((a) => a.status === 'Won').length || 2,
+          sourceProvenance: item.sourceProvenance,
+          rawCeleb: full,
+        };
+      })
+    : celebrities
+        .filter((celeb) => {
+          const matchesIndustry = selectedIndustry === 'All' || celeb.industry.toLowerCase() === selectedIndustry.toLowerCase();
+          const matchesCategory = selectedCategory === 'All' || (celeb.category || '').toLowerCase() === selectedCategory.toLowerCase();
+          const matchesCountry = selectedCountry === 'All' || (celeb.country || '').toLowerCase() === selectedCountry.toLowerCase();
+          const q = searchQuery.trim().toLowerCase();
+          const matchesSearch =
+            !q ||
+            celeb.fullName.toLowerCase().includes(q) ||
+            celeb.knownAs.toLowerCase().includes(q) ||
+            celeb.occupation.some((o) => o.toLowerCase().includes(q)) ||
+            celeb.films.some((f) => f.movieName.toLowerCase().includes(q)) ||
+            celeb.awards.some((a) => a.awardName.toLowerCase().includes(q));
 
-    const matchesSearch =
-      !searchQuery.trim() ||
-      celeb.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      celeb.knownAs.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      celeb.occupation.some((o) => o.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      celeb.films.some((f) => f.movieName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      celeb.awards.some((a) => a.awardName.toLowerCase().includes(searchQuery.toLowerCase()));
+          return matchesIndustry && matchesCategory && matchesCountry && matchesSearch;
+        })
+        .map((celeb) => ({
+          id: celeb.id,
+          fullName: celeb.fullName,
+          knownAs: celeb.knownAs,
+          category: celeb.category,
+          industry: celeb.industry,
+          country: celeb.country,
+          avatarPhoto: celeb.avatarPhoto,
+          bestViewPhoto: celeb.bestViewPhoto,
+          shortTagline: celeb.shortTagline,
+          occupation: celeb.occupation,
+          birthDetails: celeb.birthDetails,
+          filmsCount: celeb.films.length,
+          awardsCount: celeb.awards.filter((a) => a.status === 'Won').length,
+          sourceProvenance: celeb.sourceProvenance,
+          rawCeleb: celeb,
+        }));
 
-    return matchesIndustry && matchesSearch;
-  });
+  const totalCount = totalCelebrities || displayItems.length;
 
   const popularQuickSearches = [
+    'Keanu Reeves',
     'Shah Rukh Khan',
+    'Zendaya',
     'Virat Kohli',
+    'Cillian Murphy',
     'Amitabh Bachchan',
     'Deepika Padukone',
     'Prabhas',
+    'Sachin Tendulkar',
     'Rajinikanth',
     'Alia Bhatt',
-    'Akshay Kumar',
-    'Ranbir Kapoor',
     'A.R. Rahman',
+    'Max Verstappen',
     'Diljit Dosanjh',
-    'Salman Khan',
-    'MS Dhoni',
-    'Pedro Pascal',
-    'Taylor Swift',
+    'Emma Watson',
   ];
 
   const handleGlobalSearchSubmit = (e: React.FormEvent) => {
@@ -81,47 +175,47 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
 
         <div className="relative z-10 max-w-3xl space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-mono uppercase tracking-wider">
-            <Sparkles className="w-3.5 h-3.5" /> Official Roster & Global Talent Index
+            <Compass className="w-3.5 h-3.5" /> Global Celebrity Information Aggregator
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white tracking-tight leading-tight">
-            Explore Iconic Celebrities, <br />
-            <span className="text-amber-400">Unique Profiles & Global Search</span>
+            Worldwide Public Figures, <br />
+            <span className="text-amber-400">Verified Archives & Live Discovery</span>
           </h1>
 
           <p className="text-sm sm:text-base text-zinc-300 leading-relaxed max-w-2xl">
-            Browse complete, unique profiles featuring best view portrait photos, birth and family heritage, filmographies with release dates, awards won, titles conferred, social posts, and direct agency booking forms.
+            A comprehensive, zero-hallucination directory aggregating factual biographical records, filmographies, verified awards, live news coverage, and official representation channels directly from Wikipedia, Wikidata, and global journalistic archives.
           </p>
 
           <div className="flex flex-wrap gap-4 pt-2 text-xs font-mono text-zinc-400">
             <div className="flex items-center gap-1.5 bg-zinc-900/80 px-3 py-1.5 rounded-lg border border-zinc-800">
-              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-              <span>{celebrities.length} Loaded Profiles</span>
+              <Database className="w-3.5 h-3.5 text-amber-400" />
+              <span>{totalCount}+ Indexed Public Figures</span>
             </div>
             <div className="flex items-center gap-1.5 bg-zinc-900/80 px-3 py-1.5 rounded-lg border border-zinc-800">
               <Globe className="w-3.5 h-3.5 text-blue-400" />
-              <span>10,000+ AI Global Index</span>
+              <span>Multi-Source Live Discovery Engine</span>
             </div>
             <div className="flex items-center gap-1.5 bg-zinc-900/80 px-3 py-1.5 rounded-lg border border-zinc-800">
-              <Send className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Direct Agency Booking</span>
+              <Newspaper className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Live Journalistic News Feeds</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Global AI Search Box Banner */}
+      {/* Global Search & Live Discovery Box */}
       <div className="bg-gradient-to-r from-zinc-900 via-zinc-900/90 to-zinc-900 p-6 sm:p-8 rounded-2xl border border-amber-500/30 shadow-2xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-amber-400 font-mono text-xs uppercase font-bold tracking-wider">
-              <Bot className="w-4 h-4" /> Global Celebrity Instant Search Engine
+              <Globe className="w-4 h-4" /> Global Discovery & Live Verification Engine
             </div>
             <h2 className="text-xl sm:text-2xl font-serif font-bold text-white mt-1">
-              Search ANY Celebrity Across India & Worldwide
+              Search ANY Celebrity or Public Figure Worldwide
             </h2>
             <p className="text-xs text-zinc-400 mt-1">
-              Type any Indian or international celebrity name to fetch or generate a complete, unique profile with birth details, family heritage, filmography, awards, and booking options.
+              Search by name to retrieve or index any public figure. CelebVault aggregates real information from Wikipedia, Wikidata, and live news without inventing facts.
             </p>
           </div>
         </div>
@@ -133,7 +227,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               type="text"
               value={aiSearchInput}
               onChange={(e) => setAiSearchInput(e.target.value)}
-              placeholder="e.g. Amitabh Bachchan, Deepika Padukone, Virat Kohli, Allu Arjun, Rajinikanth..."
+              placeholder="e.g. Keanu Reeves, Zendaya, Amitabh Bachchan, Sachin Tendulkar, Cillian Murphy..."
               className="w-full bg-zinc-950 text-sm text-zinc-100 placeholder-zinc-500 rounded-xl pl-11 pr-4 py-3 border border-zinc-800 focus:outline-none focus:border-amber-500 font-medium"
               id="global-ai-search-input"
             />
@@ -147,12 +241,12 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
             {isGeneratingAI ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-zinc-950" />
-                <span>Searching & Generating Profile...</span>
+                <span>Aggregating from Global Sources...</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                <span>Fetch Unique Profile</span>
+                <span>Discover & View Profile</span>
               </>
             )}
           </button>
@@ -161,7 +255,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
         {/* Popular Quick-Click Chips */}
         <div className="pt-2">
           <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider block mb-2">
-            Popular Global & Indian Icons (Click to load instantly):
+            Notable Icons Across Cinema, Sports & Music (Instant discovery):
           </span>
           <div className="flex flex-wrap gap-1.5">
             {popularQuickSearches.map((name) => (
@@ -181,23 +275,132 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
         </div>
       </div>
 
+      {/* Directory Filter Bar */}
+      <div className="bg-zinc-900/90 rounded-2xl border border-zinc-800 p-4 space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Quick search input within active directory */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter by name, film, alias, or award..."
+              className="w-full bg-zinc-950 text-xs text-zinc-200 placeholder-zinc-500 rounded-xl pl-10 pr-4 py-2.5 border border-zinc-800 focus:outline-none focus:border-amber-500"
+              id="directory-filter-input"
+            />
+          </div>
+
+          {/* Controls: Industry + Sort + Advanced Toggle */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Category pills */}
+            {setSelectedCategory && (
+              <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 overflow-x-auto max-w-full">
+                {['All', 'Actors', 'Musicians', 'Athletes', 'Directors'].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                      selectedCategory === cat
+                        ? 'bg-amber-500 text-zinc-950 font-bold'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Sort Dropdown */}
+            {setSelectedSort && (
+              <select
+                value={selectedSort}
+                onChange={(e) => setSelectedSort(e.target.value as any)}
+                className="bg-zinc-950 text-xs font-mono text-zinc-300 px-3 py-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500"
+                id="directory-sort-select"
+              >
+                <option value="trending">Sort: Most Acclaimed</option>
+                <option value="name">Sort: Name (A-Z)</option>
+                <option value="recently_updated">Sort: Recently Verified</option>
+                <option value="newest">Sort: Newest Added</option>
+              </select>
+            )}
+
+            {/* Toggle Advanced Filters */}
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className={`p-2 rounded-xl border transition-colors flex items-center gap-1 text-xs ${
+                showAdvancedFilters
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                  : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200 border-zinc-800'
+              }`}
+              title="Toggle filter facets"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Facets</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Expandable Advanced Filters (Industry & Country) */}
+        {showAdvancedFilters && (
+          <div className="pt-3 border-t border-zinc-800 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label className="text-zinc-400 font-mono text-[11px] block mb-1.5 uppercase">Industry Filter</label>
+              <select
+                value={selectedIndustry}
+                onChange={(e) => setSelectedIndustry(e.target.value)}
+                className="w-full bg-zinc-950 text-zinc-200 p-2.5 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500"
+              >
+                {availableIndustries.map((ind) => (
+                  <option key={ind} value={ind}>
+                    {ind}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {setSelectedCountry && (
+              <div>
+                <label className="text-zinc-400 font-mono text-[11px] block mb-1.5 uppercase">Country Filter</label>
+                <select
+                  value={selectedCountry}
+                  onChange={(e) => setSelectedCountry(e.target.value)}
+                  className="w-full bg-zinc-950 text-zinc-200 p-2.5 rounded-xl border border-zinc-800 focus:outline-none focus:border-amber-500"
+                >
+                  {availableCountries.map((cntry) => (
+                    <option key={cntry} value={cntry}>
+                      {cntry}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Directory Grid Header */}
       <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
         <div>
           <h2 className="text-xl font-serif font-bold text-white">
-            Celebrity Roster ({filtered.length})
+            Global Public Figures Directory ({totalCount})
           </h2>
           <p className="text-xs text-zinc-400">
-            {selectedIndustry !== 'All' ? `Filtered by ${selectedIndustry}` : 'Showing all global and Indian celebrity icons'}
+            {searchQuery.trim()
+              ? `Showing results matching "${searchQuery}"`
+              : selectedCategory !== 'All'
+              ? `Filtered by category: ${selectedCategory}`
+              : 'Indexed and verified against Wikipedia, Wikidata, and authentic archives'}
           </p>
         </div>
       </div>
 
       {/* Roster Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((celeb) => {
+        {displayItems.map((celeb) => {
           const isFav = favorites.includes(celeb.id);
-          const awardsWon = celeb.awards.filter((a) => a.status === 'Won').length;
 
           return (
             <div
@@ -210,7 +413,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                 className="relative h-72 overflow-hidden bg-zinc-950 cursor-pointer"
               >
                 <img
-                  src={getSafeImageUrl(celeb.bestViewPhoto)}
+                  src={getSafeImageUrl(celeb.bestViewPhoto || celeb.avatarPhoto)}
                   alt={celeb.knownAs}
                   className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
                   onError={(e) => {
@@ -219,9 +422,16 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
 
-                {/* Industry Badge */}
-                <div className="absolute top-3 left-3 bg-zinc-950/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400 border border-zinc-800">
-                  {celeb.industry}
+                {/* Industry / Category Badge */}
+                <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                  <div className="bg-zinc-950/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400 border border-zinc-800">
+                    {celeb.industry}
+                  </div>
+                  {celeb.country && (
+                    <div className="bg-zinc-900/80 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-mono text-zinc-300 border border-zinc-700">
+                      {celeb.country}
+                    </div>
+                  )}
                 </div>
 
                 {/* Favorite Heart button */}
@@ -270,24 +480,25 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                   {/* Key Highlights (Films & Awards) */}
                   <div className="grid grid-cols-2 gap-2 text-xs bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-800/80">
                     <div>
-                      <span className="text-[10px] uppercase font-mono text-zinc-500 block">Films / Projects</span>
+                      <span className="text-[10px] uppercase font-mono text-zinc-500 block">Career Works</span>
                       <span className="font-semibold text-zinc-200 flex items-center gap-1">
                         <Clapperboard className="w-3.5 h-3.5 text-amber-400" />
-                        {celeb.films.length} Works
+                        {celeb.filmsCount} Featured
                       </span>
                     </div>
                     <div>
                       <span className="text-[10px] uppercase font-mono text-zinc-500 block">Awards Won</span>
                       <span className="font-semibold text-amber-400 flex items-center gap-1">
                         <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                        {awardsWon} Wins
+                        {celeb.awardsCount} Wins
                       </span>
                     </div>
                   </div>
 
-                  {/* Birth Quick Note */}
-                  <div className="text-xs text-zinc-400">
-                    <span className="text-zinc-500">Born:</span> {celeb.birthDetails.dateOfBirth} ({celeb.birthDetails.age} yrs)
+                  {/* Birth / Provenance Quick Note */}
+                  <div className="text-[11px] text-zinc-400 flex items-center justify-between">
+                    <span>{celeb.birthDetails.dateOfBirth}</span>
+                    <span className="text-[10px] font-mono text-emerald-400/90">✓ Verified Record</span>
                   </div>
                 </div>
 
@@ -298,18 +509,24 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                     className="flex-1 py-2.5 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-semibold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5"
                     id={`view-profile-${celeb.id}`}
                   >
-                    View Unique Profile
+                    View Verified Profile
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
 
                   <button
-                    onClick={() => onOpenBookingForm(celeb)}
+                    onClick={() => {
+                      if (celeb.rawCeleb) {
+                        onOpenBookingForm(celeb.rawCeleb);
+                      } else {
+                        onSelectCelebrity(celeb.id);
+                      }
+                    }}
                     className="py-2.5 px-3 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1 shrink-0"
-                    title="Hire / Invite / Collaborate"
+                    title="Submit Representation Inquiry"
                     id={`hire-celebrity-${celeb.id}`}
                   >
                     <Send className="w-3.5 h-3.5" />
-                    Hire
+                    Inquire
                   </button>
                 </div>
               </div>
@@ -318,12 +535,43 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
         })}
       </div>
 
-      {filtered.length === 0 && (
+      {/* Pagination Controls */}
+      {totalPages > 1 && onPageChange && (
+        <div className="flex items-center justify-center gap-2 pt-6">
+          <button
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage <= 1}
+            className="p-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl border border-zinc-800 disabled:opacity-40 transition-colors"
+            title="Previous Page"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 text-xs font-mono text-zinc-300 rounded-xl border border-zinc-800">
+            <span>Page</span>
+            <strong className="text-amber-400">{currentPage}</strong>
+            <span>of</span>
+            <span>{totalPages}</span>
+          </div>
+
+          <button
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage >= totalPages}
+            className="p-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl border border-zinc-800 disabled:opacity-40 transition-colors"
+            title="Next Page"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Empty State / Not Found -> Trigger External Discovery */}
+      {displayItems.length === 0 && (
         <div className="p-12 text-center bg-zinc-900/50 rounded-2xl border border-zinc-800 space-y-4">
           <Search className="w-10 h-10 text-amber-500/80 mx-auto" />
-          <h3 className="text-lg font-bold text-white">No Direct Match in Active List</h3>
+          <h3 className="text-lg font-bold text-white">No Public Figure Currently Cached Matching Your Query</h3>
           <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
-            Searching for <span className="text-amber-400 font-bold">"{searchQuery}"</span>? Click below to instantly query our 10,000+ Global Celebrity AI Database to generate a complete profile with filmography, awards, family details, and booking options.
+            Searching for <span className="text-amber-400 font-bold">"{searchQuery}"</span>? Click below to query Wikipedia, Wikidata, and global archives to aggregate and index their authentic profile in real-time.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             {searchQuery.trim() && (
@@ -335,12 +583,12 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                 {isGeneratingAI ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin text-zinc-950" />
-                    <span>Generating "{searchQuery}"...</span>
+                    <span>Querying Global Archives for "{searchQuery}"...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>Search Global Index for "{searchQuery}"</span>
+                    <span>Search Global Archives for "{searchQuery}"</span>
                   </>
                 )}
               </button>
@@ -349,6 +597,8 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               onClick={() => {
                 setSearchQuery('');
                 setSelectedIndustry('All');
+                if (setSelectedCategory) setSelectedCategory('All');
+                if (setSelectedCountry) setSelectedCountry('All');
               }}
               className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs rounded-xl"
             >

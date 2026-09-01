@@ -19,24 +19,41 @@ interface FilmographySectionProps {
   celebrityName: string;
 }
 
-export const FilmographySection: React.FC<FilmographySectionProps> = ({ films, celebrityName }) => {
+export const FilmographySection: React.FC<FilmographySectionProps> = ({ films = [], celebrityName }) => {
   const [filterQuery, setFilterQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'year-desc' | 'year-asc' | 'rating-desc'>('year-desc');
+  const [selectedGenre, setSelectedGenre] = useState('All');
+  const [sortBy, setSortBy] = useState<'year-desc' | 'year-asc' | 'rating-desc' | 'name-asc'>('year-desc');
   const [selectedFilm, setSelectedFilm] = useState<FilmType | null>(null);
 
+  const safeFilms = Array.isArray(films) ? films : [];
+
+  // Extract unique genres
+  const allGenres = ['All', ...Array.from(new Set(
+    safeFilms.flatMap((f) => (Array.isArray(f.genre) ? f.genre : [f.genre || ''])).filter(Boolean)
+  ))].slice(0, 8);
+
   // Filter and sort films
-  const filteredFilms = (films || [])
-    .filter(
-      (f) =>
-        f.movieName.toLowerCase().includes(filterQuery.toLowerCase()) ||
-        f.role.toLowerCase().includes(filterQuery.toLowerCase()) ||
-        f.director.toLowerCase().includes(filterQuery.toLowerCase()) ||
-        f.genre.some((g) => g.toLowerCase().includes(filterQuery.toLowerCase()))
-    )
+  const filteredFilms = safeFilms
+    .filter((f) => {
+      const q = filterQuery.toLowerCase();
+      const matchesSearch =
+        !q ||
+        (f.movieName && f.movieName.toLowerCase().includes(q)) ||
+        (f.role && f.role.toLowerCase().includes(q)) ||
+        (f.director && f.director.toLowerCase().includes(q)) ||
+        (Array.isArray(f.genre) && f.genre.some((g) => g.toLowerCase().includes(q)));
+
+      const matchesGenre =
+        selectedGenre === 'All' ||
+        (Array.isArray(f.genre) && f.genre.includes(selectedGenre));
+
+      return matchesSearch && matchesGenre;
+    })
     .sort((a, b) => {
-      if (sortBy === 'year-desc') return b.year - a.year;
-      if (sortBy === 'year-asc') return a.year - b.year;
+      if (sortBy === 'year-desc') return (b.year || 0) - (a.year || 0);
+      if (sortBy === 'year-asc') return (a.year || 0) - (b.year || 0);
       if (sortBy === 'rating-desc') return parseFloat(b.rating || '0') - parseFloat(a.rating || '0');
+      if (sortBy === 'name-asc') return (a.movieName || '').localeCompare(b.movieName || '');
       return 0;
     });
 
@@ -50,12 +67,14 @@ export const FilmographySection: React.FC<FilmographySectionProps> = ({ films, c
           </div>
           <div>
             <h2 className="text-xl font-serif font-bold text-white">Filmography & Major Works</h2>
-            <p className="text-xs text-zinc-400">Complete catalog of feature films, awards works & key projects for {celebrityName}</p>
+            <p className="text-xs text-zinc-400">
+              Complete catalog of feature films, awards works & key projects for {celebrityName} ({safeFilms.length} Total)
+            </p>
           </div>
         </div>
 
         {/* Filter and Sort Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
@@ -75,9 +94,30 @@ export const FilmographySection: React.FC<FilmographySectionProps> = ({ films, c
             <option value="year-desc">Newest First</option>
             <option value="year-asc">Oldest First</option>
             <option value="rating-desc">Highest Rated</option>
+            <option value="name-asc">Title A–Z</option>
           </select>
         </div>
       </div>
+
+      {/* Genre Filter Pill Ribbon */}
+      {allGenres.length > 2 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+          <span className="text-zinc-500 text-[11px] font-mono uppercase mr-1 shrink-0">Genre:</span>
+          {allGenres.map((genre) => (
+            <button
+              key={genre}
+              onClick={() => setSelectedGenre(genre)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all border ${
+                selectedGenre === genre
+                  ? 'bg-amber-500 text-zinc-950 font-bold border-amber-500 shadow-sm'
+                  : 'bg-zinc-950/70 text-zinc-400 border-zinc-800 hover:text-zinc-200 hover:bg-zinc-800'
+              }`}
+            >
+              {genre}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Films Cards List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

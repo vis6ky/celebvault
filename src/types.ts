@@ -1,5 +1,5 @@
 export interface BirthDetails {
-  dateOfBirth: string; // e.g., "November 11, 1974"
+  dateOfBirth: string; // e.g., "November 11, 1974" or "Not available"
   placeOfBirth: string; // e.g., "Los Angeles, California, USA"
   age: number;
   zodiacSign?: string;
@@ -14,51 +14,90 @@ export interface FamilyDetails {
   notableRelatives?: string[];
 }
 
+export interface ExternalIdentity {
+  wikidataId?: string;
+  wikipediaUrl?: string;
+  wikipediaTitle?: string;
+  imdbId?: string;
+  tmdbId?: string;
+  spotifyId?: string;
+  instagramHandle?: string;
+  xHandle?: string;
+  youtubeChannel?: string;
+  officialWebsite?: string;
+}
+
+export interface FactField {
+  field: string;
+  label: string;
+  value: string;
+  sourceName: string;
+  sourceUrl?: string;
+  lastChecked?: string;
+  isVerified: boolean;
+}
+
+export interface NewsArticle {
+  id: string;
+  title: string;
+  source: string;
+  url: string;
+  publishedAt: string;
+  retrievedAt: string;
+  snippet?: string;
+  imageUrl?: string;
+  topic?: string;
+}
+
 export interface CareerWork {
   id: string;
-  title: string; // Movie name, Album name, Championship name, etc.
+  title: string;
   year?: number;
   releaseDate?: string;
-  roleOrDiscipline?: string; // e.g. "Lead Actor (Dom Cobb)", "Forward / Striker", "Studio Album"
-  directorOrTeam?: string; // Director, Producer, Club/Team, Record Label
-  category?: string; // Film, Series, Album, Single, Tournament
+  roleOrDiscipline?: string;
+  directorOrTeam?: string;
+  category?: string;
   genre?: string[];
   boxOfficeOrSales?: string;
   ratingOrScore?: string;
   posterUrl?: string;
+  posterSource?: string;
   synopsis?: string;
 }
 
 export interface Film {
   id: string;
   movieName: string;
-  releaseDate: string; // e.g., "July 16, 2010"
+  releaseDate: string;
   year: number;
   role: string;
   director: string;
   genre: string[];
   boxOffice?: string;
-  rating?: string; // IMDb rating e.g., "8.8"
+  rating?: string;
   posterUrl: string;
+  posterSource?: string;
   synopsis: string;
 }
 
 export interface Award {
   id: string;
-  awardName: string; // e.g. "Academy Award (Oscar)", "Padma Shri", "Ballon d'Or"
+  awardName: string;
   year: number;
-  category: string; // e.g. "Best Actor in a Leading Role"
-  project?: string; // e.g. "The Revenant"
+  category: string;
+  project?: string;
   status: 'Won' | 'Nominated';
+  source?: string;
   iconType?: 'oscar' | 'golden-globe' | 'bafta' | 'grammy' | 'emmy' | 'trophy' | 'padma' | 'medal';
 }
 
 export interface CelebrityTitle {
   id: string;
-  titleName: string; // e.g. "Padma Vibhushan", "Knight Bachelor", "Hollywood Walk of Fame Star"
+  titleName: string;
   yearWon: number;
-  conferredBy: string; // e.g. "Government of India", "British Monarchy"
+  conferredBy: string;
   description: string;
+  source?: string;
 }
 
 export interface SocialPost {
@@ -82,6 +121,8 @@ export interface PhotoGalleryItem {
   caption: string;
   category: 'Red Carpet' | 'Photoshoot' | 'Behind the Scenes' | 'Events' | 'Career Moments';
   source?: string;
+  sourceId?: string;
+  lastChecked?: string;
 }
 
 export interface BookingCategory {
@@ -93,7 +134,9 @@ export interface BookingCategory {
 export interface CelebritySource {
   title: string;
   url?: string;
-  type?: 'wikipedia' | 'wikidata' | 'official' | 'imdb' | 'verified_archive';
+  type?: 'wikipedia' | 'wikidata' | 'official' | 'imdb' | 'news' | 'verified_archive';
+  retrievedAt?: string;
+  credibility?: string;
 }
 
 // Lightweight directory record for search, filtering, and pagination
@@ -101,12 +144,12 @@ export interface CelebrityDirectoryItem {
   id: string;
   fullName: string;
   knownAs: string;
-  aliases: string[]; // e.g. ["SRK", "King Khan"], ["CR7", "Ronaldo"], ["Virat", "King Kohli"]
+  aliases: string[];
   primaryProfession: string;
   occupations: string[];
   category: 'Actors' | 'Musicians' | 'Athletes' | 'Directors' | 'TV & Media' | 'Public Figures' | string;
   industry: 'Bollywood' | 'Hollywood' | 'Indian Cinema' | 'Indian Sports' | 'Global Sports' | 'Music' | 'K-Pop & Asian Pop' | 'Global Cinema' | 'European Cinema' | 'Latin Music' | string;
-  country: string; // e.g. "India", "United States", "Portugal", "United Kingdom"
+  country: string;
   nationality: string;
   avatarPhoto: string;
   bestViewPhoto: string;
@@ -115,23 +158,25 @@ export interface CelebrityDirectoryItem {
   birthYear?: number;
   isVerified: boolean;
   trendingScore?: number;
-  sourceProvenance?: 'Curated Directory' | 'Wikipedia & Wikidata' | 'Verified Knowledge Base' | 'AI Enriched' | string;
+  sourceProvenance?: string;
+  wikidataId?: string;
+  lastRefreshedAt?: string;
 }
 
 // Detailed full profile loaded when a celebrity is opened
 export interface Celebrity {
-  id: string; // e.g. "leonardo-dicaprio"
+  id: string;
   fullName: string;
   knownAs: string;
   aliases?: string[];
-  occupation: string[]; // e.g. ["Actor", "Producer", "Environmentalist"]
+  occupation: string[];
   primaryProfession?: string;
   category?: 'Actors' | 'Musicians' | 'Athletes' | 'Directors' | 'TV & Media' | 'Public Figures' | string;
   industry: 'Bollywood' | 'Hollywood' | 'Indian Cinema' | 'Indian Sports' | 'Global Sports' | 'Music' | 'European Cinema' | 'K-Pop & Asian Pop' | 'Latin Music' | 'Global Cinema' | string;
   country?: string;
   careerType?: 'actor' | 'musician' | 'athlete' | 'director' | 'public_figure' | string;
   
-  bestViewPhoto: string; // High-res main portrait
+  bestViewPhoto: string;
   avatarPhoto: string;
   coverBannerUrl: string;
   shortTagline: string;
@@ -158,6 +203,9 @@ export interface Celebrity {
   socialPosts: SocialPost[];
   gallery: PhotoGalleryItem[];
   sources?: CelebritySource[];
+  factsWithSources?: FactField[];
+  latestNews?: NewsArticle[];
+  externalIdentity?: ExternalIdentity;
 
   socialLinks: {
     instagram?: string;
@@ -177,8 +225,11 @@ export interface Celebrity {
     representationNote?: string;
   };
 
-  sourceProvenance?: 'Curated Directory' | 'Wikipedia & Wikidata' | 'Verified Knowledge Base' | 'AI Enriched' | string;
+  sourceProvenance?: string;
   isAiEnriched?: boolean;
+  lastRefreshedAt?: string;
+  updatedAt?: string;
+  createdAt?: string;
 }
 
 export interface DirectoryResponse {
@@ -209,4 +260,3 @@ export interface InquiryFormData {
   status: 'Pending Review' | 'In Discussion' | 'Approved';
   referenceCode: string;
 }
-

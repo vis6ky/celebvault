@@ -8,35 +8,67 @@ interface PhotoGallerySectionProps {
   celebrity: Celebrity;
 }
 
-export const PhotoGallerySection: React.FC<PhotoGallerySectionProps> = ({ gallery, celebrity }) => {
+export const PhotoGallerySection: React.FC<PhotoGallerySectionProps> = ({ gallery = [], celebrity }) => {
   const [activePhoto, setActivePhoto] = useState<PhotoGalleryItem | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+
+  const safeGallery = Array.isArray(gallery) ? gallery : [];
 
   // Combine gallery with best view photo
   const allPhotos: PhotoGalleryItem[] = [
     {
       id: 'main-portrait',
-      title: `${celebrity.knownAs} Best View Portrait`,
+      title: `${celebrity.knownAs} Official Portrait`,
       imageUrl: celebrity.bestViewPhoto,
-      caption: `Best view photo for ${celebrity.knownAs}.`,
+      caption: `High-resolution studio portrait for ${celebrity.knownAs}.`,
       category: 'Photoshoot',
     },
-    ...gallery,
+    ...safeGallery,
   ];
+
+  const categories = ['All', ...Array.from(new Set(allPhotos.map((p) => p.category).filter(Boolean)))];
+
+  const filteredPhotos = allPhotos.filter(
+    (p) => selectedCategory === 'All' || p.category === selectedCategory
+  );
 
   return (
     <section className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-6 shadow-xl space-y-6">
-      <div className="flex items-center gap-2.5 border-b border-zinc-800 pb-4">
-        <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
-          <Camera className="w-5 h-5" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+            <Camera className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-serif font-bold text-white">Red Carpet & Photo Gallery</h2>
+            <p className="text-xs text-zinc-400">
+              High-resolution portraits, red carpet premieres, and event showcases ({allPhotos.length} Photos)
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-serif font-bold text-white">Red Carpet & Photo Gallery</h2>
-          <p className="text-xs text-zinc-400">High-resolution portraits, red carpet premieres, and event showcases</p>
-        </div>
+
+        {/* Category Filter Pills */}
+        {categories.length > 1 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1 rounded-lg font-medium whitespace-nowrap transition-all border ${
+                  selectedCategory === cat
+                    ? 'bg-amber-500 text-zinc-950 font-bold border-amber-500 shadow-sm'
+                    : 'bg-zinc-950/70 text-zinc-400 border-zinc-800 hover:text-zinc-200 hover:bg-zinc-800'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {allPhotos.map((photo) => (
+        {filteredPhotos.map((photo) => (
           <div
             key={photo.id}
             onClick={() => setActivePhoto(photo)}
