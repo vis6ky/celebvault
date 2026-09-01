@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Sparkles, Heart, FileText, Star, X, Building2, Film, Music, Trophy } from 'lucide-react';
 import { Celebrity } from '../types';
+import { getSafeImageUrl, getMonogramFallback } from '../utils/imageUrl';
 
 interface HeaderProps {
   searchQuery: string;
@@ -114,12 +115,11 @@ export const Header: React.FC<HeaderProps> = ({
                     className="w-full text-left p-3 hover:bg-zinc-800/80 flex items-center gap-3 transition-colors group"
                   >
                     <img
-                      src={celeb.avatarPhoto}
+                      src={getSafeImageUrl(celeb.avatarPhoto)}
                       alt={celeb.knownAs}
                       className="w-10 h-10 rounded-full object-cover border border-amber-500/30 group-hover:border-amber-400"
-                      referrerPolicy="no-referrer"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80`;
+                        (e.target as HTMLImageElement).src = getMonogramFallback(celeb.knownAs, celeb.category);
                       }}
                     />
                     <div className="flex-1 min-w-0">

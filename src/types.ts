@@ -2,7 +2,7 @@ export interface BirthDetails {
   dateOfBirth: string; // e.g., "November 11, 1974"
   placeOfBirth: string; // e.g., "Los Angeles, California, USA"
   age: number;
-  zodiacSign: string;
+  zodiacSign?: string;
   nationality: string;
 }
 
@@ -12,6 +12,21 @@ export interface FamilyDetails {
   children?: string[];
   siblings?: string[];
   notableRelatives?: string[];
+}
+
+export interface CareerWork {
+  id: string;
+  title: string; // Movie name, Album name, Championship name, etc.
+  year?: number;
+  releaseDate?: string;
+  roleOrDiscipline?: string; // e.g. "Lead Actor (Dom Cobb)", "Forward / Striker", "Studio Album"
+  directorOrTeam?: string; // Director, Producer, Club/Team, Record Label
+  category?: string; // Film, Series, Album, Single, Tournament
+  genre?: string[];
+  boxOfficeOrSales?: string;
+  ratingOrScore?: string;
+  posterUrl?: string;
+  synopsis?: string;
 }
 
 export interface Film {
@@ -30,19 +45,19 @@ export interface Film {
 
 export interface Award {
   id: string;
-  awardName: string; // e.g. "Academy Award (Oscar)"
+  awardName: string; // e.g. "Academy Award (Oscar)", "Padma Shri", "Ballon d'Or"
   year: number;
   category: string; // e.g. "Best Actor in a Leading Role"
-  project: string; // e.g. "The Revenant"
+  project?: string; // e.g. "The Revenant"
   status: 'Won' | 'Nominated';
-  iconType?: 'oscar' | 'golden-globe' | 'bafta' | 'grammy' | 'emmy' | 'trophy';
+  iconType?: 'oscar' | 'golden-globe' | 'bafta' | 'grammy' | 'emmy' | 'trophy' | 'padma' | 'medal';
 }
 
 export interface CelebrityTitle {
   id: string;
-  titleName: string; // e.g. "Hollywood Walk of Fame Star"
+  titleName: string; // e.g. "Padma Vibhushan", "Knight Bachelor", "Hollywood Walk of Fame Star"
   yearWon: number;
-  conferredBy: string; // e.g. "Hollywood Chamber of Commerce"
+  conferredBy: string; // e.g. "Government of India", "British Monarchy"
   description: string;
 }
 
@@ -53,10 +68,10 @@ export interface SocialPost {
   postDate: string;
   content: string;
   imageUrl?: string;
-  likesCount: number;
-  commentsCount: number;
-  sharesCount: number;
-  isVerified: boolean;
+  likesCount?: number;
+  commentsCount?: number;
+  sharesCount?: number;
+  isVerified?: boolean;
   postUrl?: string;
 }
 
@@ -65,7 +80,8 @@ export interface PhotoGalleryItem {
   title: string;
   imageUrl: string;
   caption: string;
-  category: 'Red Carpet' | 'Photoshoot' | 'Behind the Scenes' | 'Events';
+  category: 'Red Carpet' | 'Photoshoot' | 'Behind the Scenes' | 'Events' | 'Career Moments';
+  source?: string;
 }
 
 export interface BookingCategory {
@@ -74,12 +90,47 @@ export interface BookingCategory {
   description: string;
 }
 
+export interface CelebritySource {
+  title: string;
+  url?: string;
+  type?: 'wikipedia' | 'wikidata' | 'official' | 'imdb' | 'verified_archive';
+}
+
+// Lightweight directory record for search, filtering, and pagination
+export interface CelebrityDirectoryItem {
+  id: string;
+  fullName: string;
+  knownAs: string;
+  aliases: string[]; // e.g. ["SRK", "King Khan"], ["CR7", "Ronaldo"], ["Virat", "King Kohli"]
+  primaryProfession: string;
+  occupations: string[];
+  category: 'Actors' | 'Musicians' | 'Athletes' | 'Directors' | 'TV & Media' | 'Public Figures' | string;
+  industry: 'Bollywood' | 'Hollywood' | 'Indian Cinema' | 'Indian Sports' | 'Global Sports' | 'Music' | 'K-Pop & Asian Pop' | 'Global Cinema' | 'European Cinema' | 'Latin Music' | string;
+  country: string; // e.g. "India", "United States", "Portugal", "United Kingdom"
+  nationality: string;
+  avatarPhoto: string;
+  bestViewPhoto: string;
+  coverBannerUrl?: string;
+  shortTagline: string;
+  birthYear?: number;
+  isVerified: boolean;
+  trendingScore?: number;
+  sourceProvenance?: 'Curated Directory' | 'Wikipedia & Wikidata' | 'Verified Knowledge Base' | 'AI Enriched' | string;
+}
+
+// Detailed full profile loaded when a celebrity is opened
 export interface Celebrity {
   id: string; // e.g. "leonardo-dicaprio"
   fullName: string;
   knownAs: string;
+  aliases?: string[];
   occupation: string[]; // e.g. ["Actor", "Producer", "Environmentalist"]
-  industry: 'Hollywood' | 'Music' | 'Sports' | 'Global Cinema' | 'European Cinema' | 'K-Pop & Asian Pop' | 'Latin Music' | 'Fashion' | string;
+  primaryProfession?: string;
+  category?: 'Actors' | 'Musicians' | 'Athletes' | 'Directors' | 'TV & Media' | 'Public Figures' | string;
+  industry: 'Bollywood' | 'Hollywood' | 'Indian Cinema' | 'Indian Sports' | 'Global Sports' | 'Music' | 'European Cinema' | 'K-Pop & Asian Pop' | 'Latin Music' | 'Global Cinema' | string;
+  country?: string;
+  careerType?: 'actor' | 'musician' | 'athlete' | 'director' | 'public_figure' | string;
+  
   bestViewPhoto: string; // High-res main portrait
   avatarPhoto: string;
   coverBannerUrl: string;
@@ -97,14 +148,16 @@ export interface Celebrity {
     earlyLife: string;
     careerHighlights: string;
     philanthropicWork: string;
-    famousQuote: string;
+    famousQuote?: string;
   };
 
   films: Film[];
+  majorWorks?: CareerWork[];
   awards: Award[];
   titles: CelebrityTitle[];
   socialPosts: SocialPost[];
   gallery: PhotoGalleryItem[];
+  sources?: CelebritySource[];
 
   socialLinks: {
     instagram?: string;
@@ -119,9 +172,24 @@ export interface Celebrity {
   agencyDetails: {
     agentName: string;
     agencyName: string;
-    bookingFeeRange: string;
+    bookingFeeRange?: string;
     preferredEvents: string[];
+    representationNote?: string;
   };
+
+  sourceProvenance?: 'Curated Directory' | 'Wikipedia & Wikidata' | 'Verified Knowledge Base' | 'AI Enriched' | string;
+  isAiEnriched?: boolean;
+}
+
+export interface DirectoryResponse {
+  items: CelebrityDirectoryItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  categories: string[];
+  industries: string[];
+  countries: string[];
 }
 
 export interface InquiryFormData {
@@ -141,3 +209,4 @@ export interface InquiryFormData {
   status: 'Pending Review' | 'In Discussion' | 'Approved';
   referenceCode: string;
 }
+

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Star, Sparkles, Trophy, Clapperboard, Heart, Send, Search, CheckCircle2, ShieldCheck, ArrowRight, Loader2, Globe, Bot } from 'lucide-react';
 import { Celebrity } from '../types';
+import { getSafeImageUrl, getMonogramFallback } from '../utils/imageUrl';
 
 interface DirectoryViewProps {
   celebrities: Celebrity[];
@@ -209,13 +210,11 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                 className="relative h-72 overflow-hidden bg-zinc-950 cursor-pointer"
               >
                 <img
-                  src={celeb.bestViewPhoto}
+                  src={getSafeImageUrl(celeb.bestViewPhoto)}
                   alt={celeb.knownAs}
                   className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
-                  referrerPolicy="no-referrer"
                   onError={(e) => {
-                    // Fallback to stylized high quality portrait if URL fails
-                    (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80`;
+                    (e.target as HTMLImageElement).src = getMonogramFallback(celeb.knownAs, celeb.category);
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />

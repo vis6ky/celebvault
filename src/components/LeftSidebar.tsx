@@ -5,6 +5,7 @@ import {
   Globe, Instagram, Twitter, Facebook, ExternalLink, Maximize2, ShieldCheck, UserCheck
 } from 'lucide-react';
 import { Celebrity } from '../types';
+import { getSafeImageUrl, getMonogramFallback } from '../utils/imageUrl';
 
 interface LeftSidebarProps {
   celebrity: Celebrity;
@@ -28,13 +29,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       {/* 1. Best View Photo Card */}
       <div className="relative group rounded-xl overflow-hidden border border-zinc-700/60 shadow-lg bg-zinc-950">
         <img
-          src={celebrity.bestViewPhoto}
+          src={getSafeImageUrl(celebrity.bestViewPhoto)}
           alt={`${celebrity.knownAs} Best View Photo`}
           className="w-full h-[380px] object-cover object-top group-hover:scale-105 transition-transform duration-500 cursor-pointer"
           onClick={() => setIsPhotoExpanded(true)}
-          referrerPolicy="no-referrer"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80`;
+            (e.target as HTMLImageElement).src = getMonogramFallback(celebrity.knownAs, celebrity.category);
           }}
           id="best-view-photo-img"
         />
@@ -279,10 +279,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               ✕
             </button>
             <img
-              src={celebrity.bestViewPhoto}
+              src={getSafeImageUrl(celebrity.bestViewPhoto)}
               alt={celebrity.knownAs}
               className="max-h-[80vh] w-auto object-contain rounded-2xl shadow-2xl border border-zinc-800"
-              referrerPolicy="no-referrer"
             />
             <div className="mt-4 text-center">
               <h3 className="text-xl font-bold font-serif text-white">{celebrity.knownAs}</h3>

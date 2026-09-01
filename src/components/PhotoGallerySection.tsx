@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Camera, Maximize2, X } from 'lucide-react';
 import { PhotoGalleryItem, Celebrity } from '../types';
+import { getSafeImageUrl, getMonogramFallback } from '../utils/imageUrl';
 
 interface PhotoGallerySectionProps {
   gallery: PhotoGalleryItem[];
@@ -42,12 +43,11 @@ export const PhotoGallerySection: React.FC<PhotoGallerySectionProps> = ({ galler
             className="group relative h-48 rounded-xl overflow-hidden border border-zinc-800 cursor-pointer bg-zinc-950 hover:border-amber-500/50 transition-all shadow"
           >
             <img
-              src={photo.imageUrl}
+              src={getSafeImageUrl(photo.imageUrl)}
               alt={photo.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              referrerPolicy="no-referrer"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80`;
+                (e.target as HTMLImageElement).src = getMonogramFallback(celebrity.knownAs, photo.category);
               }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
@@ -78,10 +78,9 @@ export const PhotoGallerySection: React.FC<PhotoGallerySectionProps> = ({ galler
               <X className="w-5 h-5" />
             </button>
             <img
-              src={activePhoto.imageUrl}
+              src={getSafeImageUrl(activePhoto.imageUrl)}
               alt={activePhoto.title}
               className="max-h-[75vh] w-auto object-contain rounded-2xl shadow-2xl border border-zinc-800"
-              referrerPolicy="no-referrer"
             />
             <div className="mt-4 text-center space-y-1">
               <span className="text-xs font-mono uppercase bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20">
